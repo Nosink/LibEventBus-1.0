@@ -1,12 +1,11 @@
-local MAJOR, MINOR = "LibEventBus-1.0", 1
-if not LibStub then error(MAJOR .. " requires LibStub") end
+local LibStub = LibStub
+local error = error
 
-local LibEvent = LibStub:NewLibrary(MAJOR, MINOR)
-if not LibEvent then return end
+local major, minor = "LibEventBus-1.0", 1
+if not LibStub then error(major .. " requires LibStub") end
 
--------------------------------------------------
--- Utilities
--------------------------------------------------
+local lib = LibStub:NewLibrary(major, minor)
+if not lib then return end
 
 local pcall = pcall
 local geterrorhandler = geterrorhandler
@@ -27,17 +26,11 @@ local function fastCall(fn, ...)
     return fn(...)
 end
 
--------------------------------------------------
--- Bus Prototype
--------------------------------------------------
+-- Prototype
+local proto = {}
+proto.__index = proto
 
-local BusProto = {}
-BusProto.__index = BusProto
-
--------------------------------------------------
 -- Bus Creation
--------------------------------------------------
-
 local function NewBus(name, safe)
     local frame = CreateFrame("Frame")
 
@@ -48,7 +41,7 @@ local function NewBus(name, safe)
         onceHandlers = {},
         nativeEvents = {},
         safe         = safe or true,
-    }, BusProto)
+    }, proto)
 
     frame:SetScript("OnEvent", function(_, event, ...)
         bus:dispatch(event, ...)
@@ -57,11 +50,8 @@ local function NewBus(name, safe)
     return bus
 end
 
--------------------------------------------------
 -- Internal helpers (instance methods)
--------------------------------------------------
-
-function BusProto:registerEvent(event)
+function proto:registerEvent(event)
     local list = self.handlers[event]
     if list then return list end
 
@@ -76,7 +66,7 @@ function BusProto:registerEvent(event)
     return list
 end
 
-function BusProto:unregisterEvents(event, list)
+function proto:unregisterEvents(event, list)
     if #list > 0 then return end
 
     self.handlers[event] = nil
@@ -89,7 +79,7 @@ function BusProto:unregisterEvents(event, list)
     self.onceHandlers[event] = nil
 end
 
-function BusProto:dispatch(event, ...)
+function proto:dispatch(event, ...)
     local list = self.handlers[event]
     if not list then return end
 
@@ -120,7 +110,7 @@ function BusProto:dispatch(event, ...)
     self:unregisterEvents(event, list)
 end
 
-function BusProto:clearHandler(event, fn)
+function proto:clearHandler(event, fn)
     local list = self.handlers[event]
     if not list then return end
 
@@ -133,11 +123,8 @@ function BusProto:clearHandler(event, fn)
     end
 end
 
--------------------------------------------------
 -- Public Bus API
--------------------------------------------------
-
-function BusProto:RegisterEvent(event, fn)
+function proto:RegisterEvent(event, fn)
     if type(event) ~= "string" or type(fn) ~= "function" then return end
 
     local list = self:registerEvent(event)
@@ -157,7 +144,7 @@ function BusProto:RegisterEvent(event, fn)
     end
 end
 
-function BusProto:RegisterEventOnce(event, fn)
+function proto:RegisterEventOnce(event, fn)
     if type(event) ~= "string" or type(fn) ~= "function" then return end
 
     local map = self.onceHandlers[event]
@@ -183,7 +170,7 @@ function BusProto:RegisterEventOnce(event, fn)
     end
 end
 
-function BusProto:UnregisterEvent(event, fn)
+function proto:UnregisterEvent(event, fn)
     local list = self.handlers[event]
     if not list or type(fn) ~= "function" then return end
 
@@ -198,7 +185,7 @@ function BusProto:UnregisterEvent(event, fn)
     self:unregisterEvents(event, list)
 end
 
-function BusProto:UnregisterAll(event)
+function proto:UnregisterAll(event)
     local list = self.handlers[event]
     if not list then return end
 
@@ -210,23 +197,20 @@ function BusProto:UnregisterAll(event)
     self:unregisterEvents(event, list)
 end
 
-function BusProto:TriggerEvent(event, ...)
+function proto:TriggerEvent(event, ...)
     self:dispatch(event, ...)
 end
 
-function BusProto:IsRegistered(event)
+function proto:IsRegistered(event)
     local list = self.handlers[event]
     return list and #list > 0 or false
 end
 
--------------------------------------------------
 -- Hooks (shared, not per-bus)
--------------------------------------------------
-
 local hookedFuncs = {}
 local hookedScripts = setmetatable({}, { __mode = "k" })
 
-function BusProto:HookSecureFunc(frame, funcName, handler)
+function proto:HookSecureFunc(frame, funcName, handler)
     if type(frame) == "string" then
         frame, funcName, handler = _G, frame, funcName
     end
@@ -241,7 +225,7 @@ function BusProto:HookSecureFunc(frame, funcName, handler)
     end)
 end
 
-function BusProto:HookScript(frame, script, handler)
+function proto:HookScript(frame, script, handler)
     if type(frame) ~= "table" or type(handler) ~= "function" then return end
 
     local set = hookedScripts[frame]
@@ -257,59 +241,53 @@ function BusProto:HookScript(frame, script, handler)
     end)
 end
 
--------------------------------------------------
 -- Global Bus Singleton
--------------------------------------------------
-
-local GlobalBus
+local globalBus
 
 local function GetGlobalBus()
-    if not GlobalBus then
-        GlobalBus = NewBus("Global", true)
+    if not globalBus then
+        globalBus = NewBus("Global", true)
     end
-    return GlobalBus
+    return globalBus
 end
 
--------------------------------------------------
 -- LibEvent API proxies
--------------------------------------------------
-
-function LibEvent:NewBus(...)
+function lib:NewBus(...)
     return NewBus(...)
 end
 
-function LibEvent:GetGlobalBus()
+function lib:GetGlobalBus()
     return GetGlobalBus()
 end
 
-function LibEvent:RegisterEvent(...)
+function lib:RegisterEvent(...)
     return GetGlobalBus():RegisterEvent(...)
 end
 
-function LibEvent:RegisterEventOnce(...)
+function lib:RegisterEventOnce(...)
     return GetGlobalBus():RegisterEventOnce(...)
 end
 
-function LibEvent:UnregisterEvent(...)
+function lib:UnregisterEvent(...)
     return GetGlobalBus():UnregisterEvent(...)
 end
 
-function LibEvent:UnregisterAll(...)
+function lib:UnregisterAll(...)
     return GetGlobalBus():UnregisterAll(...)
 end
 
-function LibEvent:TriggerEvent(...)
+function lib:TriggerEvent(...)
     return GetGlobalBus():TriggerEvent(...)
 end
 
-function LibEvent:IsRegistered(...)
+function lib:IsRegistered(...)
     return GetGlobalBus():IsRegistered(...)
 end
 
-function LibEvent:HookSecureFunc(...)
+function lib:HookSecureFunc(...)
     return GetGlobalBus():HookSecureFunc(...)
 end
 
-function LibEvent:HookScript(...)
+function lib:HookScript(...)
     return GetGlobalBus():HookScript(...)
 end
