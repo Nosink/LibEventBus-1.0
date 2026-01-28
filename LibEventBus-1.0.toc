@@ -11,4 +11,5 @@
 ## X-Category: Library
 ## X-License: GNU General Public License v3.0
 
+LibStub/LibStub.lua
 LibEventBus-1.0.lua
